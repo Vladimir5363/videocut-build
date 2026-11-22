@@ -1,0 +1,40 @@
+name: Build VideoCut APK
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'VideoCut_Offline.zip'
+      - '.github/workflows/build.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK 35
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Install Gradle 8.7
+        run: |
+          curl -L https://services.gradle.org/distributions/gradle-8.7-bin.zip -o /tmp/gradle.zip
+          unzip -q /tmp/gradle.zip -d /tmp
+      - name: Extract Android project
+        run: |
+          mkdir source
+          unzip -q VideoCut_Offline.zip -d source
+      - name: Build debug APK
+        run: /tmp/gradle-8.7/bin/gradle -p source/VideoCut_Offline :app:assembleDebug --no-daemon
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: VideoCut-debug-apk
+          path: source/VideoCut_Offline/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
