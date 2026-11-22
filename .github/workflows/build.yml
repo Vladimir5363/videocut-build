@@ -1,4 +1,5 @@
 name: Build VideoCut APK
+
 on:
   workflow_dispatch:
   push:
@@ -12,25 +13,42 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-      - name: Install Android SDK 35
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      # GitHub's Ubuntu runner already has Android SDK installed.
+      # Avoid android-actions/setup-android here: its sdkmanager bootstrap
+      # failed on the runner before the actual project build started.
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort | tail -n 1)"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "sdkmanager was not found under $ANDROID_HOME/cmdline-tools"
+            exit 1
+          fi
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
+
       - name: Install Gradle 8.7
         run: |
-          curl -L https://services.gradle.org/distributions/gradle-8.7-bin.zip -o /tmp/gradle.zip
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.7-bin.zip -o /tmp/gradle.zip
           unzip -q /tmp/gradle.zip -d /tmp
+
       - name: Extract Android project
         run: |
-          mkdir source
+          mkdir -p source
           unzip -q VideoCut_Offline.zip -d source
+
       - name: Build debug APK
         run: /tmp/gradle-8.7/bin/gradle -p source/VideoCut_Offline :app:assembleDebug --no-daemon
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
